@@ -84,14 +84,6 @@ Start the interactive terminal session to ask questions in natural language and 
 python3 main.py
 ```
 
-### 3. Run the Evaluation Benchmark:
-
-Run the automated benchmarking suite to evaluate the baseline system against the CAV-SQL pipeline.
-
-```bash
-python3 eval/benchmark.py
-```
-
 ---
 
 ## 🧠 How It Works (The CAV-SQL Loop)
