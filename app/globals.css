@@ -1,0 +1,200 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Deep Vintage Mood Theme
+   Primary: #244855 (Dark Teal)
+   Accent: #E64833 (Coral Red)
+   Secondary: #874F41 (Warm Brown)
+   Muted: #90AEAD (Sage)
+   Background: #FBE9D0 (Cream)
+*/
+
+:root {
+  --background: #FBE9D0;
+  --foreground: #244855;
+  --card: #FFFFFF;
+  --card-foreground: #244855;
+  --popover: #FFFFFF;
+  --popover-foreground: #244855;
+  --primary: #244855;
+  --primary-foreground: #FBE9D0;
+  --secondary: #874F41;
+  --secondary-foreground: #FBE9D0;
+  --muted: #90AEAD;
+  --muted-foreground: #244855;
+  --accent: #E64833;
+  --accent-foreground: #FFFFFF;
+  --destructive: #E64833;
+  --destructive-foreground: #FFFFFF;
+  --border: #90AEAD;
+  --input: #90AEAD;
+  --ring: #244855;
+  --chart-1: #244855;
+  --chart-2: #E64833;
+  --chart-3: #874F41;
+  --chart-4: #90AEAD;
+  --chart-5: #FBE9D0;
+  --radius: 0.625rem;
+  --sidebar: #244855;
+  --sidebar-foreground: #FBE9D0;
+  --sidebar-primary: #E64833;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #874F41;
+  --sidebar-accent-foreground: #FBE9D0;
+  --sidebar-border: #90AEAD;
+  --sidebar-ring: #E64833;
+  
+  /* Custom vintage tokens */
+  --vintage-cream: #FBE9D0;
+  --vintage-teal: #244855;
+  --vintage-coral: #E64833;
+  --vintage-brown: #874F41;
+  --vintage-sage: #90AEAD;
+}
+
+.dark {
+  --background: #1a1a1a;
+  --foreground: #FBE9D0;
+  --card: #244855;
+  --card-foreground: #FBE9D0;
+  --popover: #244855;
+  --popover-foreground: #FBE9D0;
+  --primary: #E64833;
+  --primary-foreground: #FFFFFF;
+  --secondary: #874F41;
+  --secondary-foreground: #FBE9D0;
+  --muted: #3a3a3a;
+  --muted-foreground: #90AEAD;
+  --accent: #90AEAD;
+  --accent-foreground: #244855;
+  --destructive: #E64833;
+  --destructive-foreground: #FFFFFF;
+  --border: #3a3a3a;
+  --input: #3a3a3a;
+  --ring: #E64833;
+  --chart-1: #E64833;
+  --chart-2: #90AEAD;
+  --chart-3: #874F41;
+  --chart-4: #FBE9D0;
+  --chart-5: #244855;
+  --sidebar: #0f0f0f;
+  --sidebar-foreground: #FBE9D0;
+  --sidebar-primary: #E64833;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #244855;
+  --sidebar-accent-foreground: #FBE9D0;
+  --sidebar-border: #3a3a3a;
+  --sidebar-ring: #E64833;
+  
+  --vintage-cream: #FBE9D0;
+  --vintage-teal: #244855;
+  --vintage-coral: #E64833;
+  --vintage-brown: #874F41;
+  --vintage-sage: #90AEAD;
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* Custom vintage colors */
+  --color-vintage-cream: var(--vintage-cream);
+  --color-vintage-teal: var(--vintage-teal);
+  --color-vintage-coral: var(--vintage-coral);
+  --color-vintage-brown: var(--vintage-brown);
+  --color-vintage-sage: var(--vintage-sage);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar for vintage theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}
+
+/* React Flow styles */
+.react-flow__node {
+  border-radius: 8px;
+  border: 2px solid var(--primary);
+  background: var(--card);
+}
+
+.react-flow__edge-path {
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+
+.react-flow__controls button {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.react-flow__controls button:hover {
+  background: var(--muted);
+}
+
+.react-flow__minimap {
+  background: var(--card);
+  border: 1px solid var(--border);
+}
