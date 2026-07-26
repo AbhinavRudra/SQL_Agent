@@ -1,0 +1,709 @@
+====================================================================================== FAILURES =======================================================================================
+___________________________________________________________________ test_chinook_text_to_sql_pipeline[CHINOOK-001] ____________________________________________________________________
+
+self = <sqlalchemy.engine.base.Connection object at 0x79929d827570>, dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x79929d703390>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x79929d89be10>, statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x79929d7b8690>
+parameters = [()]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1967: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x79929d703390>, cursor = <sqlite3.Cursor object at 0x79929ebd6ec0>
+statement = '\n            SELECT t.Name AS TrackName, g.Name AS GenreName \n            FROM Track t \n            JOIN Genre g ON t.GenreId = g.GenreId;\n        ', parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x79929d89be10>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlite3.OperationalError: no such table: Track
+
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py:952: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+test_env = {'agent': CAVSQLAgentRuntime(executor=AgentExecutor(verbose=True, agent=RunnableMultiActionAgent(runnable=RunnableAssi...ons=5), cav_engine=<cav_engine.cav_engine.CAVEngine object at 0x79929d714ec0>), 'engine': Engine(sqlite:///Chinook.db)}
+case = {'id': 'CHINOOK-001', 'question': 'List all tracks in the database with their respective genre names.', 'expected_tables': ['track', 'genre'], 'should_pass_cav': True, ...}
+
+    @pytest.mark.parametrize("case", EVAL_DATASET, ids=lambda c: c["id"])
+    def test_chinook_text_to_sql_pipeline(test_env, case):
+        agent = test_env["agent"]
+        engine = test_env["engine"]
+    
+        session_id = f"chinook-eval-{case['id']}"
+        logger.info(
+            f"Executing Benchmarking Pipeline on {case['id']}: '{case['question']}'"
+        )
+    
+        # Run user question tracking session details down stream
+        result_state = agent.run(case["question"])
+    
+        # 1. Evaluate CAV Interception Layer Integrity
+        if not case["should_pass_cav"]:
+            assert result_state["cav_feedback"] != "PASS", (
+                f"Security Boundary Error: Unmapped/Malicious tables bypassed CAV security gates on {case['id']}."
+            )
+            logger.info(f"✔ Case {case['id']} blocked successfully by CAV.")
+            return
+    
+        assert result_state["cav_feedback"] == "PASS", (
+            f"False Positive Error: Valid query was incorrectly rejected by CAV: {result_state['error_history']}"
+        )
+    
+        # 2. Inspect Structural AST Mapping
+        generated_sql = result_state["draft_sql"].lower()
+        for table in case["expected_tables"]:
+            assert table in generated_sql, (
+                f"Structural Blueprint Error: Generated SQL code did not reference necessary dependency relationship table '{table}'"
+            )
+    
+        # 3. Run Ground Truth Queries and Assert Results Matrix Equality
+        try:
+            with engine.connect() as conn:
+>               gt_res = conn.execute(sa_text(case["ground_truth_query"]))
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+eval/run_eval.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1419: in execute
+    return meth(
+.venv/lib/python3.13/site-packages/sqlalchemy/sql/elements.py:527: in _execute_on_connection
+    return connection._execute_clauseelement(
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1846: in _execute_context
+    return self._exec_single_context(
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1986: in _exec_single_context
+    self._handle_dbapi_exception(
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:2363: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1967: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x79929d703390>, cursor = <sqlite3.Cursor object at 0x79929ebd6ec0>
+statement = '\n            SELECT t.Name AS TrackName, g.Name AS GenreName \n            FROM Track t \n            JOIN Genre g ON t.GenreId = g.GenreId;\n        ', parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x79929d89be10>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such table: Track
+E       [SQL: 
+E                   SELECT t.Name AS TrackName, g.Name AS GenreName 
+E                   FROM Track t 
+E                   JOIN Genre g ON t.GenreId = g.GenreId;
+E               ]
+E       (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py:952: OperationalError
+
+During handling of the above exception, another exception occurred:
+
+test_env = {'agent': CAVSQLAgentRuntime(executor=AgentExecutor(verbose=True, agent=RunnableMultiActionAgent(runnable=RunnableAssi...ons=5), cav_engine=<cav_engine.cav_engine.CAVEngine object at 0x79929d714ec0>), 'engine': Engine(sqlite:///Chinook.db)}
+case = {'id': 'CHINOOK-001', 'question': 'List all tracks in the database with their respective genre names.', 'expected_tables': ['track', 'genre'], 'should_pass_cav': True, ...}
+
+    @pytest.mark.parametrize("case", EVAL_DATASET, ids=lambda c: c["id"])
+    def test_chinook_text_to_sql_pipeline(test_env, case):
+        agent = test_env["agent"]
+        engine = test_env["engine"]
+    
+        session_id = f"chinook-eval-{case['id']}"
+        logger.info(
+            f"Executing Benchmarking Pipeline on {case['id']}: '{case['question']}'"
+        )
+    
+        # Run user question tracking session details down stream
+        result_state = agent.run(case["question"])
+    
+        # 1. Evaluate CAV Interception Layer Integrity
+        if not case["should_pass_cav"]:
+            assert result_state["cav_feedback"] != "PASS", (
+                f"Security Boundary Error: Unmapped/Malicious tables bypassed CAV security gates on {case['id']}."
+            )
+            logger.info(f"✔ Case {case['id']} blocked successfully by CAV.")
+            return
+    
+        assert result_state["cav_feedback"] == "PASS", (
+            f"False Positive Error: Valid query was incorrectly rejected by CAV: {result_state['error_history']}"
+        )
+    
+        # 2. Inspect Structural AST Mapping
+        generated_sql = result_state["draft_sql"].lower()
+        for table in case["expected_tables"]:
+            assert table in generated_sql, (
+                f"Structural Blueprint Error: Generated SQL code did not reference necessary dependency relationship table '{table}'"
+            )
+    
+        # 3. Run Ground Truth Queries and Assert Results Matrix Equality
+        try:
+            with engine.connect() as conn:
+                gt_res = conn.execute(sa_text(case["ground_truth_query"]))
+                gt_rows = [tuple(r) for r in gt_res.fetchall()]
+                gt_cols = list(gt_res.keys())
+                ground_truth_matrix = {"columns": gt_cols, "rows": gt_rows}
+        except Exception as dbe:
+>           pytest.fail(
+                f"Ground Truth Query failed execution setup step on case {case['id']}: {dbe}"
+            )
+E           Failed: Ground Truth Query failed execution setup step on case CHINOOK-001: (sqlite3.OperationalError) no such table: Track
+E           [SQL: 
+E                       SELECT t.Name AS TrackName, g.Name AS GenreName 
+E                       FROM Track t 
+E                       JOIN Genre g ON t.GenreId = g.GenreId;
+E                   ]
+E           (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+eval/run_eval.py:199: Failed
+___________________________________________________________________ test_chinook_text_to_sql_pipeline[CHINOOK-002] ____________________________________________________________________
+
+test_env = {'agent': CAVSQLAgentRuntime(executor=AgentExecutor(verbose=True, agent=RunnableMultiActionAgent(runnable=RunnableAssi...ons=5), cav_engine=<cav_engine.cav_engine.CAVEngine object at 0x79929d714ec0>), 'engine': Engine(sqlite:///Chinook.db)}
+case = {'id': 'CHINOOK-002', 'question': 'Which countries have the most invoices? Return the billing country and count, ordered from highest to lowest.', 'expected_tables': ['invoice'], 'should_pass_cav': True, ...}
+
+    @pytest.mark.parametrize("case", EVAL_DATASET, ids=lambda c: c["id"])
+    def test_chinook_text_to_sql_pipeline(test_env, case):
+        agent = test_env["agent"]
+        engine = test_env["engine"]
+    
+        session_id = f"chinook-eval-{case['id']}"
+        logger.info(
+            f"Executing Benchmarking Pipeline on {case['id']}: '{case['question']}'"
+        )
+    
+        # Run user question tracking session details down stream
+>       result_state = agent.run(case["question"])
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+eval/run_eval.py:170: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+agent_workflow/sql_agent_cav.py:31: in run
+    result = self.executor.invoke(
+.venv/lib/python3.13/site-packages/langchain_classic/chains/base.py:167: in invoke
+    self._call(inputs, run_manager=run_manager)
+.venv/lib/python3.13/site-packages/langchain_classic/agents/agent.py:1590: in _call
+    next_step_output = self._take_next_step(
+.venv/lib/python3.13/site-packages/langchain_classic/agents/agent.py:1290: in _take_next_step
+    list(
+.venv/lib/python3.13/site-packages/langchain_classic/agents/agent.py:1373: in _iter_next_step
+    yield self._perform_agent_action(
+.venv/lib/python3.13/site-packages/langchain_classic/agents/agent.py:1398: in _perform_agent_action
+    observation = tool.run(
+.venv/lib/python3.13/site-packages/langchain_core/tools/base.py:1001: in run
+    raise error_to_raise
+.venv/lib/python3.13/site-packages/langchain_core/tools/base.py:960: in run
+    tool_args, tool_kwargs = self._to_args_and_kwargs(
+.venv/lib/python3.13/site-packages/langchain_core/tools/base.py:862: in _to_args_and_kwargs
+    tool_input = self._parse_input(tool_input, tool_call_id)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = InfoSQLDatabaseTool(description='Input to this tool is a comma-separated list of tables, output is the schema and samp...e Input: table1, table2, table3', db=<langchain_community.utilities.sql_database.SQLDatabase object at 0x79929d714980>)
+tool_input = {'tables': 'Invoice'}, tool_call_id = None
+
+    def _parse_input(
+        self, tool_input: str | dict, tool_call_id: str | None
+    ) -> str | dict[str, Any]:
+        """Parse and validate tool input using the args schema.
+    
+        Args:
+            tool_input: The raw input to the tool.
+            tool_call_id: The ID of the tool call, if available.
+    
+        Returns:
+            The parsed and validated input.
+    
+        Raises:
+            ValueError: If `string` input is provided with JSON schema `args_schema`.
+            ValueError: If `InjectedToolCallId` is required but `tool_call_id` is not
+                provided.
+            TypeError: If `args_schema` is not a Pydantic `BaseModel` or dict.
+        """
+        input_args = self.args_schema
+    
+        if isinstance(tool_input, str):
+            if input_args is not None:
+                if isinstance(input_args, dict):
+                    msg = (
+                        "String tool inputs are not allowed when "
+                        "using tools with JSON schema args_schema."
+                    )
+                    raise ValueError(msg)
+                key_ = next(iter(get_fields(input_args).keys()))
+                if issubclass(input_args, BaseModel):
+                    input_args.model_validate({key_: tool_input})
+                elif issubclass(input_args, BaseModelV1):
+                    input_args.parse_obj({key_: tool_input})
+                else:
+                    msg = f"args_schema must be a Pydantic BaseModel, got {input_args}"
+                    raise TypeError(msg)
+            return tool_input
+    
+        if input_args is not None:
+            if isinstance(input_args, dict):
+                return tool_input
+            if issubclass(input_args, BaseModel):
+                # Check args_schema for InjectedToolCallId
+                for k, v in get_all_basemodel_annotations(input_args).items():
+                    if _is_injected_arg_type(v, injected_type=InjectedToolCallId):
+                        if tool_call_id is None:
+                            msg = (
+                                "When tool includes an InjectedToolCallId "
+                                "argument, tool must always be invoked with a full "
+                                "model ToolCall of the form: {'args': {...}, "
+                                "'name': '...', 'type': 'tool_call', "
+                                "'tool_call_id': '...'}"
+                            )
+                            raise ValueError(msg)
+                        tool_input[k] = tool_call_id
+>               result = input_args.model_validate(tool_input)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               pydantic_core._pydantic_core.ValidationError: 1 validation error for _InfoSQLDatabaseToolInput
+E               table_names
+E                 Field required [type=missing, input_value={'tables': 'Invoice'}, input_type=dict]
+E                   For further information visit https://errors.pydantic.dev/2.13/v/missing
+
+.venv/lib/python3.13/site-packages/langchain_core/tools/base.py:711: ValidationError
+___________________________________________________________________ test_chinook_text_to_sql_pipeline[CHINOOK-003] ____________________________________________________________________
+
+test_env = {'agent': CAVSQLAgentRuntime(executor=AgentExecutor(verbose=True, agent=RunnableMultiActionAgent(runnable=RunnableAssi...ons=5), cav_engine=<cav_engine.cav_engine.CAVEngine object at 0x79929d714ec0>), 'engine': Engine(sqlite:///Chinook.db)}
+case = {'id': 'CHINOOK-003', 'question': 'Who are the top 5 customers based on total spending amount?', 'expected_tables': ['customer', 'invoice'], 'should_pass_cav': True, ...}
+
+    @pytest.mark.parametrize("case", EVAL_DATASET, ids=lambda c: c["id"])
+    def test_chinook_text_to_sql_pipeline(test_env, case):
+        agent = test_env["agent"]
+        engine = test_env["engine"]
+    
+        session_id = f"chinook-eval-{case['id']}"
+        logger.info(
+            f"Executing Benchmarking Pipeline on {case['id']}: '{case['question']}'"
+        )
+    
+        # Run user question tracking session details down stream
+        result_state = agent.run(case["question"])
+    
+        # 1. Evaluate CAV Interception Layer Integrity
+        if not case["should_pass_cav"]:
+            assert result_state["cav_feedback"] != "PASS", (
+                f"Security Boundary Error: Unmapped/Malicious tables bypassed CAV security gates on {case['id']}."
+            )
+            logger.info(f"✔ Case {case['id']} blocked successfully by CAV.")
+            return
+    
+>       assert result_state["cav_feedback"] == "PASS", (
+            f"False Positive Error: Valid query was incorrectly rejected by CAV: {result_state['error_history']}"
+        )
+E       AssertionError: False Positive Error: Valid query was incorrectly rejected by CAV: []
+E       assert '' == 'PASS'
+E         
+E         - PASS
+
+eval/run_eval.py:180: AssertionError
+___________________________________________________________________ test_chinook_text_to_sql_pipeline[CHINOOK-004] ____________________________________________________________________
+
+self = <sqlalchemy.engine.base.Connection object at 0x79929d7a23f0>, dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x79929d703390>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x79929d7b1260>, statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x79929d9a6d50>
+parameters = [()]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1967: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x79929d703390>, cursor = <sqlite3.Cursor object at 0x79929d782540>
+statement = "\n            SELECT t.Name FROM Track t\n            JOIN Genre g ON t.GenreId = g.GenreId\n            JOIN Album a...       JOIN Artist ar ON ar.ArtistId = al.ArtistId\n            WHERE g.Name = 'Rock' AND ar.Name = 'AC/DC';\n        "
+parameters = (), context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x79929d7b1260>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlite3.OperationalError: no such table: Track
+
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py:952: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+test_env = {'agent': CAVSQLAgentRuntime(executor=AgentExecutor(verbose=True, agent=RunnableMultiActionAgent(runnable=RunnableAssi...ons=5), cav_engine=<cav_engine.cav_engine.CAVEngine object at 0x79929d714ec0>), 'engine': Engine(sqlite:///Chinook.db)}
+case = {'id': 'CHINOOK-004', 'question': 'Find all rock songs written by the artist AC/DC.', 'expected_tables': ['track', 'genre', 'album', 'artist'], 'should_pass_cav': True, ...}
+
+    @pytest.mark.parametrize("case", EVAL_DATASET, ids=lambda c: c["id"])
+    def test_chinook_text_to_sql_pipeline(test_env, case):
+        agent = test_env["agent"]
+        engine = test_env["engine"]
+    
+        session_id = f"chinook-eval-{case['id']}"
+        logger.info(
+            f"Executing Benchmarking Pipeline on {case['id']}: '{case['question']}'"
+        )
+    
+        # Run user question tracking session details down stream
+        result_state = agent.run(case["question"])
+    
+        # 1. Evaluate CAV Interception Layer Integrity
+        if not case["should_pass_cav"]:
+            assert result_state["cav_feedback"] != "PASS", (
+                f"Security Boundary Error: Unmapped/Malicious tables bypassed CAV security gates on {case['id']}."
+            )
+            logger.info(f"✔ Case {case['id']} blocked successfully by CAV.")
+            return
+    
+        assert result_state["cav_feedback"] == "PASS", (
+            f"False Positive Error: Valid query was incorrectly rejected by CAV: {result_state['error_history']}"
+        )
+    
+        # 2. Inspect Structural AST Mapping
+        generated_sql = result_state["draft_sql"].lower()
+        for table in case["expected_tables"]:
+            assert table in generated_sql, (
+                f"Structural Blueprint Error: Generated SQL code did not reference necessary dependency relationship table '{table}'"
+            )
+    
+        # 3. Run Ground Truth Queries and Assert Results Matrix Equality
+        try:
+            with engine.connect() as conn:
+>               gt_res = conn.execute(sa_text(case["ground_truth_query"]))
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+eval/run_eval.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1419: in execute
+    return meth(
+.venv/lib/python3.13/site-packages/sqlalchemy/sql/elements.py:527: in _execute_on_connection
+    return connection._execute_clauseelement(
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1846: in _execute_context
+    return self._exec_single_context(
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1986: in _exec_single_context
+    self._handle_dbapi_exception(
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:2363: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py:1967: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x79929d703390>, cursor = <sqlite3.Cursor object at 0x79929d782540>
+statement = "\n            SELECT t.Name FROM Track t\n            JOIN Genre g ON t.GenreId = g.GenreId\n            JOIN Album a...       JOIN Artist ar ON ar.ArtistId = al.ArtistId\n            WHERE g.Name = 'Rock' AND ar.Name = 'AC/DC';\n        "
+parameters = (), context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x79929d7b1260>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such table: Track
+E       [SQL: 
+E                   SELECT t.Name FROM Track t
+E                   JOIN Genre g ON t.GenreId = g.GenreId
+E                   JOIN Album al ON al.AlbumId = t.AlbumId
+E                   JOIN Artist ar ON ar.ArtistId = al.ArtistId
+E                   WHERE g.Name = 'Rock' AND ar.Name = 'AC/DC';
+E               ]
+E       (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py:952: OperationalError
+
+During handling of the above exception, another exception occurred:
+
+test_env = {'agent': CAVSQLAgentRuntime(executor=AgentExecutor(verbose=True, agent=RunnableMultiActionAgent(runnable=RunnableAssi...ons=5), cav_engine=<cav_engine.cav_engine.CAVEngine object at 0x79929d714ec0>), 'engine': Engine(sqlite:///Chinook.db)}
+case = {'id': 'CHINOOK-004', 'question': 'Find all rock songs written by the artist AC/DC.', 'expected_tables': ['track', 'genre', 'album', 'artist'], 'should_pass_cav': True, ...}
+
+    @pytest.mark.parametrize("case", EVAL_DATASET, ids=lambda c: c["id"])
+    def test_chinook_text_to_sql_pipeline(test_env, case):
+        agent = test_env["agent"]
+        engine = test_env["engine"]
+    
+        session_id = f"chinook-eval-{case['id']}"
+        logger.info(
+            f"Executing Benchmarking Pipeline on {case['id']}: '{case['question']}'"
+        )
+    
+        # Run user question tracking session details down stream
+        result_state = agent.run(case["question"])
+    
+        # 1. Evaluate CAV Interception Layer Integrity
+        if not case["should_pass_cav"]:
+            assert result_state["cav_feedback"] != "PASS", (
+                f"Security Boundary Error: Unmapped/Malicious tables bypassed CAV security gates on {case['id']}."
+            )
+            logger.info(f"✔ Case {case['id']} blocked successfully by CAV.")
+            return
+    
+        assert result_state["cav_feedback"] == "PASS", (
+            f"False Positive Error: Valid query was incorrectly rejected by CAV: {result_state['error_history']}"
+        )
+    
+        # 2. Inspect Structural AST Mapping
+        generated_sql = result_state["draft_sql"].lower()
+        for table in case["expected_tables"]:
+            assert table in generated_sql, (
+                f"Structural Blueprint Error: Generated SQL code did not reference necessary dependency relationship table '{table}'"
+            )
+    
+        # 3. Run Ground Truth Queries and Assert Results Matrix Equality
+        try:
+            with engine.connect() as conn:
+                gt_res = conn.execute(sa_text(case["ground_truth_query"]))
+                gt_rows = [tuple(r) for r in gt_res.fetchall()]
+                gt_cols = list(gt_res.keys())
+                ground_truth_matrix = {"columns": gt_cols, "rows": gt_rows}
+        except Exception as dbe:
+>           pytest.fail(
+                f"Ground Truth Query failed execution setup step on case {case['id']}: {dbe}"
+            )
+E           Failed: Ground Truth Query failed execution setup step on case CHINOOK-004: (sqlite3.OperationalError) no such table: Track
+E           [SQL: 
+E                       SELECT t.Name FROM Track t
+E                       JOIN Genre g ON t.GenreId = g.GenreId
+E                       JOIN Album al ON al.AlbumId = t.AlbumId
+E                       JOIN Artist ar ON ar.ArtistId = al.ArtistId
+E                       WHERE g.Name = 'Rock' AND ar.Name = 'AC/DC';
+E                   ]
+E           (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+eval/run_eval.py:199: Failed
+---------------------------------------------------------------------------------- Captured log call ----------------------------------------------------------------------------------
+WARNING  agent_workflow.sql_agent_cav:sql_agent_cav.py:131 CAV REJECTED query: 
+            CAV_ERROR: Could not produce a verified query after
+
+            3 attempts.
+
+            Last error: Error: Table 'songs' not found in schema. Available tables: ['invoice', 'album', 'customer', 'employee', 'artist', 'invoice_line', 'track', 'playlist', 'playlist_track', 'genre', 'media_type'].
+=============================================================================== short test summary info ===============================================================================
+FAILED eval/run_eval.py::test_chinook_text_to_sql_pipeline[CHINOOK-001] - Failed: Ground Truth Query failed execution setup step on case CHINOOK-001: (sqlite3.OperationalError) no such table: Track
+FAILED eval/run_eval.py::test_chinook_text_to_sql_pipeline[CHINOOK-002] - pydantic_core._pydantic_core.ValidationError: 1 validation error for _InfoSQLDatabaseToolInput
+FAILED eval/run_eval.py::test_chinook_text_to_sql_pipeline[CHINOOK-003] - AssertionError: False Positive Error: Valid query was incorrectly rejected by CAV: []
+FAILED eval/run_eval.py::test_chinook_text_to_sql_pipeline[CHINOOK-004] - Failed: Ground Truth Query failed execution setup step on case CHINOOK-004: (sqlite3.OperationalError) no such table: Track
+======================================================================= 4 failed, 1 passed in 344.18s (0:05:44) =======================================================================
